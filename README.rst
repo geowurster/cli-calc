@@ -46,6 +46,7 @@ Basic math operations for Unix pipes.
       mod     Modulo values by a single divisor.
       mode    Compute mode.
       mul     Multiply values by a constant.
+      pow     Exponentiation of values by a constant.
       radd    Reduce by addition.
       rdiv    Reduce by division.
       rmod    Reduce by modulo.
@@ -64,7 +65,7 @@ Developing
     $ git clone https://github.com/geowurster/pcalc.git
     $ cd tpcalc
     $ pip install -e .\[dev\]
-    $ py.test --cov tpcalc --cov-report term-missing
+    $ py.test --cov pcalc --cov-report term-missing
 
 
 License
