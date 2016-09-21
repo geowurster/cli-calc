@@ -137,7 +137,7 @@ def mod(divisor):
 
     """Modulo values by a single divisor.
 
-    Result has the same sign as the divisor.
+    Result has the same sign as the divisor.  Uses Python's 'math.fmod()'.
     """
 
     for v in _values():
@@ -145,13 +145,14 @@ def mod(divisor):
 
 
 @cli.command()
-def rmod(values):
+def rmod():
 
     """Reduce by modulo.
 
-    Results has the same sign as the final divisor."""
+    Result has the same sign as the divisor.  Uses Python's 'math.fmod()'.
+    """
 
-    click.echo(reduce(op.mod, values))
+    click.echo(reduce(math.fmod, _values()))
 
 
 @cli.command()
@@ -206,10 +207,10 @@ def radd():
 
 
 @cli.command()
-def rsub(values):
+def rsub():
     """Reduce by subtraction."""
 
-    click.echo(reduce(op.sub, values))
+    click.echo(reduce(op.sub, _values()))
 
 
 @cli.command()
@@ -242,14 +243,14 @@ def median():
 
     """Compute median."""
 
-    values = tuple(_values())
+    values = sorted(_values())
     if len(values) % 2:
-        stop = len(values) / 2
-        start = stop - 1
+        click.echo(values[int((len(values) - 1) / 2)])
+    else:
+        stop = int(len(values) / 2) + 1
+        start = stop - 2
         middle = values[start:stop]
         click.echo(sum(middle) / 2)
-    else:
-        click.echo((len(values) / 2) - 1)
 
 
 @cli.command()
@@ -274,6 +275,16 @@ def mode():
         click.echo(mode[0][0])
     else:
         raise click.Abort("Multiple mode's - unsure how to format.")
+
+
+@cli.command(name='pow')
+@constant_arg
+def pow_(constant):
+
+    """Exponentiation of values by a constant."""
+
+    for v in _values():
+        click.echo(pow(v, constant))
 
 
 if __name__ == '__main__':
