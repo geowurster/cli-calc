@@ -211,3 +211,15 @@ def test_eval_reduce(invoke):
     result = invoke('eval', [1, 2, 3], ['--reduce', "(a ** 2) + b"])
     assert result.exit_code == 0
     assert result.output.strip() == '12.0'
+
+
+def test_bad_input(invoke):
+    result = invoke('add', ['cannot cast to float'], ['1'])
+    assert result.exit_code != 0
+    assert 'cast value to float' in result.output
+
+
+def test_whitespace_input(invoke):
+    result = invoke('add', ['', ' ', 1, os.linesep], ['1'])
+    assert result.exit_code == 0
+    assert result.output.strip() == '2.0'

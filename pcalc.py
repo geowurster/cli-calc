@@ -74,12 +74,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 
 
+def _cast_float(v):
+    try:
+        return float(v)
+    except ValueError:
+        raise click.ClickException(
+            "Could not cast value to float: {}".format(v))
+
+
 def _values():
     """Read values from ``stdin`` and cast to ``float``."""
     stream = click.get_text_stream('stdin')
     stream = filter(op.methodcaller('strip'), stream)
     stream = filter(None, stream)
-    stream = map(float, stream)
+    stream = map(_cast_float, stream)
 
     try:
         first = next(stream)
