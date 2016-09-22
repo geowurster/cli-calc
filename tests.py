@@ -3,6 +3,7 @@
 
 import os
 
+import click
 from click.testing import CliRunner
 import pytest
 
@@ -60,7 +61,8 @@ def invoke():
     ['rmod', (7, -3), -2.0],
     ['rmul', (2, 2, 2), 8.0],
     ['sum', (1, 2, 3), 6.0],
-    ['rsub', (1, 2, 3), -4]
+    ['rsub', (1, 2, 3), -4],
+    ['rpow', (2, 2, 2), 16]
 ])
 def test_reducers(invoke, cmd, input, expected):
 
@@ -107,9 +109,11 @@ def test_round(invoke, input, precision, func):
     ['floor', [-1.23, 4.0001], [], ['-2', '4']],
     ['div', [-1.23, 100, -000.1], ['3.21'], ['-0.38317001', '31.15264001', '-0.03115001']],
     ['mul', [1, 10, 100], ['--', '-1'], ['-1.0', '-10.0', '-100.0']],
-    ['abs', ['1', '-2', '-3.456'], [], ['1.0', '2.0', '3.456']],
-    ['pow', ['1', '2', '4'], ['2'], ['1.0', '4.0', '16.0']],
-    ['mod', ['7', '5'], ['3'], ['1', '2']]
+    ['abs', [1, -2, -3.456], [], ['1.0', '2.0', '3.456']],
+    ['pow', [1, 2, 4], ['2'], ['1.0', '4.0', '16.0']],
+    ['mod', [7, 5], ['3'], ['1', '2']],
+    ['eval', [1, 2, 3], ['(v * -1) + 0.1'], ['-0.9', '-1.9', '-2.9']],
+    ['eval', [1, 2, 3], ["((v + 1) * 10) % 3"], ['2.0', '0.0', '1.0']]   # Referenced in CLI helped
 ])
 def test_streaming(invoke, cmd, input, args, expected):
 
@@ -169,3 +173,41 @@ def test_commands_no_data(invoke, cmd):
     assert result.exit_code != '0'
     if "stdin didn't" not in result.output.lower():
         assert 'missing argument' in result.output.lower()
+
+
+def test_eval_scope():
+
+    assert pcalc._GLOBAL_EVAL_SCOPE == {
+        '__builtin__': None, '__builtins__': None}
+
+    # Verify that most of the CLI commands have a corresponding function in
+    # the eval scope
+    scope_funcs = []
+    commands = pcalc.cli.commands.keys()
+    for cmd in commands:
+        non_reduce = cmd[1:]
+        if cmd.startswith('r') and non_reduce in commands:
+            scope_funcs.append(non_reduce)
+    scope_funcs.append('math')
+    for func in scope_funcs:
+        assert func in pcalc._LOCAL_EVAL_SCOPE
+
+
+def test_evaluate():
+    line = 1123456789
+
+    # Expression does not produce int or float
+    with pytest.raises(click.ClickException) as e:
+        pcalc._evaluate("'word'", {}, {}, line=line)
+    assert str(line) in str(e)
+
+    # Expression references something not present in the scope
+    with pytest.raises(click.ClickException) as e:
+        pcalc._evaluate("whatever", {}, {}, line)
+    assert "not present in the scope" in str(e) or "not defined" in str(e)
+
+
+def test_eval_reduce(invoke):
+    result = invoke('eval', [1, 2, 3], ['--reduce', "(a ** 2) + b"])
+    assert result.exit_code == 0
+    assert result.output.strip() == '12.0'
