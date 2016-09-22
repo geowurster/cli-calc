@@ -13,13 +13,16 @@ Basic math operations for Unix pipes.
 
 .. code-block:: console
 
-    $ pcalc
+    $ pcalc --help
     Usage: pcalc [OPTIONS] COMMAND [ARGS]...
 
       Basic math operations for Unix pipes.
 
+      When working with a negative positional argument: '$ pcalc mul -- -1'
+
       All commands read from 'stdin' and write to 'stdout'.  Most commands
-      stream but a few (like median) hold all values in memory.
+      stream but a few (like median) hold all values in memory.  Empty or all
+      whitespace lines are skipped.
 
       Some commands (typically prefixed with 'r') reduce all input values to a
       single value.  For instance, '$ pcalc add 3' adds 3 to all input values,
