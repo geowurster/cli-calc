@@ -80,7 +80,7 @@ setup(
     keywords='command line CLI math unix pipe',
     license="New BSD",
     long_description=readme,
-    py_modules='pcalc',
+    py_modules=['pcalc'],
     url=source,
     version=version,
     zip_safe=True,
