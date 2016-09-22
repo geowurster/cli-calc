@@ -36,7 +36,7 @@ def parse_dunder_line(string):
 with open('pcalc.py') as f:
     dunders = dict(map(
         parse_dunder_line,
-        filter(lambda l: l.strip().startswith('__'), f.readlines()[:40])))
+        filter(lambda l: l.strip().startswith('__'), f.readlines())))
     version = dunders['__version__']
     author = dunders['__author__']
     email = dunders['__email__']
