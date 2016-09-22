@@ -10,8 +10,45 @@ import pcalc
 
 
 @pytest.fixture('function')
-def runner():
-    return CliRunner()
+def invoke():
+    """Return a function that pins ``click.testing.CliRunner().invoke()`` to
+    ``pcalc.cli``.
+
+    Returns
+    -------
+    function
+    """
+    
+    def _invoke(cmd, input, args=None):
+
+        """Calls ``click.testing.CliRunner().invoke()`` with ``pcalc.cli``,
+        the given parameters, and returns the result.
+
+        Parameter
+        ---------
+        cmd : str
+            Subcommand name.
+        input : list
+            Values to convert to a block of text and pass to ``stdin``.
+        args : list or None, optional
+            Additional arguments for the subcommand.
+
+        Returns
+        -------
+        click.testing.Result
+        """
+
+        # Convert float values to text block
+        input = os.linesep.join(list(map(str, input)))
+
+        if args is None:
+            args = []
+        else:
+            args = list(args)
+
+        return CliRunner().invoke(pcalc.cli, [cmd] + args, input=input)
+    
+    return _invoke
 
 
 @pytest.mark.parametrize("cmd,input,expected", [
@@ -20,67 +57,115 @@ def runner():
     ['median', (4, 3, 2, 1), 2.5],
     ['radd', (1, 2, 3), 6.0],
     ['rdiv', (100, 10, 2), 5.0],
-    ['rmod', (7, -3), 1.0],
+    ['rmod', (7, -3), -2.0],
     ['rmul', (2, 2, 2), 8.0],
     ['sum', (1, 2, 3), 6.0],
     ['rsub', (1, 2, 3), -4]
 ])
-def test_reducers(runner, cmd, input, expected):
+def test_reducers(invoke, cmd, input, expected):
 
     """Commands that reduce input values to a single output value."""
 
-    result = runner.invoke(
-        pcalc.cli, [cmd], input=os.linesep.join(map(str, input)))
+    result = invoke(cmd, input)
     assert result.exit_code == 0
     assert float(result.output) == expected
 
 
 @pytest.mark.parametrize("cmd", [
-    'mean', 'median', 'median', 'radd', 'rdiv', 'rmod', 'rmul', 'sum', 'rsub'])
-def test_reducers_single_value(runner, cmd):
+    'mean', 'median', 'mode', 'radd', 'rdiv', 'rmod', 'rmul', 'sum', 'rsub'])
+def test_reducers_single_value(invoke, cmd):
 
     """Reducers receiving a single value should prdduce only that value."""
 
-    result = runner.invoke(pcalc.cli, [cmd], input='-10{}'.format(os.linesep))
+    result = invoke(cmd, [-10])
     assert result.exit_code == 0
     assert float(result.output) == -10.0
 
 
-def test_pow(runner):
-    pass
+@pytest.mark.parametrize("input,precision,func", [
+    [[1.234567, 3.456789], '0', lambda x: int(round(x, 0))],
+    [[1.234567, 3.456789], '1', lambda x: round(x, 1)]
+])
+def test_round(invoke, input, precision, func):
+
+    """Check rounding to 0 and a specific precision."""
+
+    result = invoke('round', input, args=[precision])
+    assert result.exit_code == 0
+
+    expected = map(float, result.output.strip().splitlines())
+    expected = map(func, expected)
+    expected = map(str, expected)
+    expected = os.linesep.join(list(expected))
+    assert result.output.strip() == expected.strip()
 
 
-def test_add(runner):
-    pass
+@pytest.mark.parametrize("cmd,input,args,expected", [
+    ['sub', [1.23, -4.56, 6], ['3'], ['-1.77', '-7.56', '3.0']],
+    ['add', [1.23, -4.56, 6], ['10'], ['11.23', '5.44', '16.0']],
+    ['ceil', [-1.23, 4.0001], [], ['-1', '5']],
+    ['floor', [-1.23, 4.0001], [], ['-2', '4']],
+    ['div', [-1.23, 100, -000.1], ['3.21'], ['-0.38317001', '31.15264001', '-0.03115001']],
+    ['mul', [1, 10, 100], ['--', '-1'], ['-1.0', '-10.0', '-100.0']],
+    ['abs', ['1', '-2', '-3.456'], [], ['1.0', '2.0', '3.456']],
+    ['pow', ['1', '2', '4'], ['2'], ['1.0', '4.0', '16.0']],
+    ['mod', ['7', '5'], ['3'], ['1', '2']]
+])
+def test_streaming(invoke, cmd, input, args, expected):
+
+    """Commands that stream input values, transform, and emit."""
+
+    result = invoke(cmd, input, args)
+    assert result.exit_code == 0
+
+    # Division is harder to check
+    if cmd == 'div':
+        expected = list(map(float, expected))
+        actual = list(map(float, result.output.splitlines()))
+        for e, a in zip(expected, actual):
+            assert round(e - a, 5) <= 1e-05
+    else:
+        assert result.output.splitlines() == expected
 
 
-def test_ceil(runner):
-    pass
+def test_mode(invoke):
+    result = invoke('mode', [1, 5, 8, 10, 10])
+    assert result.exit_code == 0
+    assert result.output.strip() == '10.0'
 
 
-def test_div(runner):
-    pass
+def test_mode_exception(invoke):
+    result = invoke('mode', [1, 1, 2, 2])
+    assert result.exit_code != 0
+    assert 'multiple' in result.output.lower()
 
 
-def test_floor(runner):
-    pass
+def test_mod_fmod(invoke):
+
+    """The ``--fmod`` flag changes the output."""
+
+    result = invoke('mod', ['7', '5'], ['3', '--fmod'])
+    assert result.exit_code == 0
+    assert result.output.splitlines() == ['1', '2']
 
 
-def test_mod(runner):
-    pass
+def test_rmod_fmod(invoke):
+
+    """The ``--fmod`` flag changes the output."""
+
+    result = invoke('rmod', [7, -3], ['--fmod'])
+    assert result.exit_code == 0
+    assert result.output.strip() == '1'
 
 
-def test_mode(runner):
-    pass
+@pytest.mark.parametrize("cmd", pcalc.cli.commands.keys())
+def test_commands_no_data(invoke, cmd):
 
-
-def test_mul(runner):
-    pass
-
-
-def test_round(runner):
-    pass
-
-
-def test_sub(runner):
-    pass
+    """Commands that don't get any data should generally exit with an error
+    code, however those that have a required positional argument will exit
+    with a slightly different code.  This test is approximate but good enough.
+    """
+    result = invoke(cmd, [])
+    assert result.exit_code != '0'
+    if "stdin didn't" not in result.output.lower():
+        assert 'missing argument' in result.output.lower()

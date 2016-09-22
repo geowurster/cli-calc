@@ -12,10 +12,10 @@ import sys
 import click
 
 
-if sys.version_info.major == 2:
+if sys.version_info.major == 2:  # pragma: no cover
     map = it.imap
     filter = it.ifilter
-else:
+else:  # pragma: no cover
     from functools import reduce
 
 
@@ -58,10 +58,39 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 def _values():
     """Read values from ``stdin`` and cast to ``float``."""
-    return map(float, click.get_text_stream('stdin'))
+    stream = click.get_text_stream('stdin')
+    stream = filter(op.methodcaller('strip'), stream)
+    stream = filter(None, stream)
+    stream = map(float, stream)
+
+    try:
+        first = next(stream)
+    except StopIteration:
+        raise click.ClickException("stdin didn't get any data.")
+
+    return it.chain([first], stream)
+
+
+def _cb_fmod(ctx, param, value):
+
+    """Click callback to translate the ``--fmod`` flag directly to a modulo
+    function.
+    """
+
+    if value:
+        func = math.fmod
+    else:
+        func = op.mod
+
+    return lambda a, b: int(func(a, b))
 
 
 constant_arg = click.argument('constant', type=click.FLOAT, required=True)
+fmod_opt = click.option(
+    '--fmod', 'mod_func', is_flag=True, callback=_cb_fmod,
+    help="Use Python's 'math.fmod()' function, which is better suited for "
+         "floats, instead of the modulo operator.  Causes output to be a "
+         "float instead of integer.")
 
 
 @click.group()
@@ -69,8 +98,11 @@ def cli():
 
     """Basic math operations for Unix pipes.
 
+    When working with a negative positional argument: '$ pcalc mul -- -1'
+
     All commands read from 'stdin' and write to 'stdout'.  Most commands
-    stream but a few (like median) hold all values in memory.
+    stream but a few (like median) hold all values in memory.  Empty or all
+    whitespace lines are skipped.
 
     Some commands (typically prefixed with 'r') reduce all input values to a
     single value.  For instance, '$ pcalc add 3' adds 3 to all input values,
@@ -104,7 +136,7 @@ def round_(precision):
     """
 
     if precision == 0:
-        def func(x):
+        def func(x, _):
             return int(round(x, 0))
     else:
         func = round
@@ -119,7 +151,7 @@ def ceil():
     """Ceiling values."""
 
     for v in _values():
-        click.echo(math.ceil(v))
+        click.echo(int(math.ceil(v)))  # Value not cast to int on Python 2
 
 
 @cli.command()
@@ -128,31 +160,33 @@ def floor():
     """Floor values."""
 
     for v in _values():
-        click.echo(math.floor(v))
+        click.echo(int(math.floor(v)))  # Value not cast to int on Python 2
 
 
 @cli.command()
-@click.argument('divisor', type=click.FLOAT, required=True)
-def mod(divisor):
+@click.argument('denominator', type=click.FLOAT, required=True)
+@fmod_opt
+def mod(denominator, mod_func):
 
     """Modulo values by a single divisor.
 
-    Result has the same sign as the divisor.  Uses Python's 'math.fmod()'.
+    Output is dictated by the '--fmod' flag.
     """
 
     for v in _values():
-        click.echo(math.fmod(v, divisor))
+        click.echo(mod_func(v, denominator))
 
 
 @cli.command()
-def rmod():
+@fmod_opt
+def rmod(mod_func):
 
     """Reduce by modulo.
 
-    Result has the same sign as the divisor.  Uses Python's 'math.fmod()'.
+    Output is dictated by the '--fmod' flag.
     """
 
-    click.echo(reduce(math.fmod, _values()))
+    click.echo(reduce(mod_func, _values()))
 
 
 @cli.command()
@@ -230,11 +264,11 @@ def rdiv():
 
 
 @cli.command(name='abs')
-def abs_(values):
+def abs_():
 
     """Compute absolute value."""
 
-    for v in values:
+    for v in _values():
         click.echo(abs(v))
 
 
@@ -270,11 +304,14 @@ def mode():
     Formatting multiple modes is a little ambiguous in the context of pcalc,
     so this condition triggers an error."""
 
-    mode = Counter(_values()).most_common()
-    if len(mode) == 1:
-        click.echo(mode[0][0])
+    count = Counter(_values())
+
+    # If the two most common elements have the same count then there are at
+    # least 2 modes.
+    if len(count) > 1 and len({c[-1] for c in count.most_common(2)}) == 1:
+        raise click.ClickException("Multiple mode's - unsure how to format.")
     else:
-        raise click.Abort("Multiple mode's - unsure how to format.")
+        click.echo(count.most_common(1)[0][0])
 
 
 @cli.command(name='pow')
@@ -285,7 +322,3 @@ def pow_(constant):
 
     for v in _values():
         click.echo(pow(v, constant))
-
-
-if __name__ == '__main__':
-    cli()
