@@ -299,6 +299,22 @@ def abs_():
         _echo(abs(v))
 
 
+@cli.command(name='min')
+def min_():
+
+    """Compute min."""
+
+    _echo(min(_values()))
+
+
+@cli.command(name='max')
+def max_():
+
+    """Compute max."""
+
+    _echo(max(_values()))
+
+
 @cli.command()
 def median():
 

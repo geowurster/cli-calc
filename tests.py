@@ -53,6 +53,8 @@ def invoke():
 
 
 @pytest.mark.parametrize("cmd,input,expected", [
+    ['min', (4, 2, 8, 1), 1],
+    ['max', (4, 2, 8, 1), 8],
     ['mean', (0, 10), 5.0],
     ['median', (1, 2, 3), 2.0],
     ['median', (4, 3, 2, 1), 2.5],
@@ -74,7 +76,8 @@ def test_reducers(invoke, cmd, input, expected):
 
 
 @pytest.mark.parametrize("cmd", [
-    'mean', 'median', 'mode', 'radd', 'rdiv', 'rmod', 'rmul', 'sum', 'rsub'])
+    'min', 'max', 'mean', 'median', 'mode', 'radd', 'rdiv', 'rmod', 'rmul',
+    'sum', 'rsub'])
 def test_reducers_single_value(invoke, cmd):
 
     """Reducers receiving a single value should prdduce only that value."""
